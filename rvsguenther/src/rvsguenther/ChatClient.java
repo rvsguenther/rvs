@@ -1,5 +1,9 @@
 package rvsguenther;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.UnknownHostException;
 import java.util.Scanner;
 import java.util.concurrent.*;
 
@@ -13,30 +17,12 @@ public class ChatClient {
 	
 	public static class Client {
 		
-	}
-	
-	public static class clientthread extends Thread {
+		private Socket Adressbuchverbindung = new Socket();
 		
-		private boolean _terminate = false;
-		private Server myServer;
+		public void connect( String ip, int port ) throws UnknownHostException, IOException {
+			this.Adressbuchverbindung.connect( new InetSocketAddress( ip, port ) );
+		}	
 		
-		public clientthread( Server myServer ) {
-			this.myServer = myServer;
-		}
-		
-		MyThread() {
-			_terminate = false;
-		}
-		
-		private void terminate() {
-			_terminate = true;
-		}
-		
-		public void run() {
-			while( !_terminate ) {
-
-			}
-		}
 		
 	}
 	
@@ -64,17 +50,15 @@ public class ChatClient {
 		}
 	}
 	
-	public static void main( String[] args ) {
+	public static void main( String[] args ) throws NumberFormatException, UnknownHostException, IOException {
 		Server myServer = new Server();
 		Client myClient = new Client();
 		
 		serverthread server = new serverthread( myClient );
-		clientthread client = new clientthread( myServer );
 		server.start();
-		client.start();
 		
 		Scanner S = new Scanner(System.in);
-		System.out.println("Welcome! To show commands use 'help', type 'connect [adress]' to connect to a server. Try 'list' for a list of online users and 'message [name] [message]' to message a user.");
+		System.out.println("Welcome! To show commands use 'help', type 'connect [ip:port]' to connect to a server. Try 'list' for a list of online users and 'message [name] [message]' to message a user.");
 		while(true) {
 			String[] eingaben = S.next().split(" ");
 			switch( eingaben[0] ) {
@@ -82,8 +66,12 @@ public class ChatClient {
 					System.out.println("Welcome! To show commands use 'help', type 'connect [adress]' to connect to a server. Try 'list' for a list of online users and 'message [name] [message]' to message a user.");
 					break;
 				case "list":
-					System.out.println(test.get(i++));
+					System.out.println();
 					break;
+				case "connect":
+					System.out.println(eingaben.length);
+					String[] address = eingaben[1].split(":");
+					myClient.connect(address[0], new Integer( null ).valueOf( address[1] ));
 				default:
 					System.out.println("Welcome! To show commands use 'help', type 'connect [adress]' to connect to a server. Try 'list' for a list of online users and 'message [name] [message]' to message a user.");
 					break;
