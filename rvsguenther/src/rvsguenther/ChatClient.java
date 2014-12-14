@@ -107,9 +107,21 @@ public class ChatClient {
 			return Reader.readLine().split(" ");
 		}
 		
-		public String read() throws IOException {
+		public String[] readListe() throws IOException {
+			List<String> Inhalt = new ArrayList<String>();
 			BufferedReader Reader = new BufferedReader( new InputStreamReader( this.Verbindung.getInputStream() ) );
-			return Reader.readLine();
+			String tmp = "";
+			char r = 0;
+			do {
+			r = (char) Reader.read();
+				if( r != '\n' && r!= '\r' )
+					tmp += String.valueOf(r);
+				else {
+					Inhalt.add(tmp);
+					tmp = "";
+				}
+			} while( Reader.ready() );
+			return Inhalt.toArray(new String[0]);
 		}
 		
 		public void sendeDaten( String Daten ) throws IOException {
@@ -215,7 +227,20 @@ public class ChatClient {
 					System.out.println("Welcome! To show commands use 'help', type 'connect [adress]' to connect to a server. Try 'list' for a list of online users and 'message [name] [message]' to message a user.");
 					break;
 				case "list":
-					System.out.println();
+					myAdressClient.sendeDaten( "t" );
+					String Answer2[] = myAdressClient.readListe();
+					String[] Answer21 = Answer2[0].split(" ");
+					if( !Answer21[0].equals( "t" ) ) {
+						System.err.println( "Server sendet verwirrende Antwort." );
+						myAdressClient.close();
+					}
+					int numOfUsers1 = Integer.parseInt( Answer21[1] );
+					Teilnehmerliste.clear();
+					for(int j = 1; j <= numOfUsers1; j++) {
+						System.out.println( Answer2[j] );
+						String[] Teil1 = Answer2[j].split(" ");
+						Teilnehmerliste.add( new Chatteilnehmer( Teil1[0], Teil1[1], Integer.parseInt( Teil1[2] ) ) );
+					}
 					break;
 				case "connect":
 					String[] address = eingaben[1].split(":");
@@ -230,31 +255,19 @@ public class ChatClient {
 						break;
 					}
 					myAdressClient.sendeDaten( "t" );
-					String lol = myAdressClient.read();
-					System.out.println(lol);
-					lol = myAdressClient.read();
-					System.out.println(lol);
-					/*Answer = myAdressClient.empfangeDaten();
-					if( !Answer[0].equals( "t" ) ) {
+					Answer = myAdressClient.readListe();
+					String[] Answer1 = Answer[0].split(" ");
+					if( !Answer1[0].equals( "t" ) ) {
 						System.err.println( "Server sendet verwirrende Antwort." );
 						myAdressClient.close();
 					}
-					int numOfUsers = Integer.parseInt( Answer[1] );
+					int numOfUsers = Integer.parseInt( Answer1[1] );
 					Teilnehmerliste.clear();
-					for(int j = 0; j <= Answer.length-1; j++)
+					for(int j = 1; j <= numOfUsers; j++) {
 						System.out.println( Answer[j] );
-					myAdressClient.sendeDaten("t");
-					Answer = myAdressClient.empfangeDaten();
-					for(int j = 0; j <= Answer.length-1; j++)
-						System.out.println( Answer[j] );
-					/*for( int i = 1; i <= numOfUsers; i++ ) {
-						System.out.println("sende t");
-						Answer = myAdressClient.empfangeDaten();
-						for(int j = 0; j <= Answer.length-1; j++)
-							System.out.println( Answer[j] );
-						System.out.println("sende t2");
-						Teilnehmerliste.add( new Chatteilnehmer( Answer[0], Answer[1], Integer.parseInt( Answer[2] ) ) );
-					}*/
+						String[] Teil = Answer[j].split(" ");
+						Teilnehmerliste.add( new Chatteilnehmer( Teil[0], Teil[1], Integer.parseInt( Teil[2] ) ) );
+					}
 					break;
 				case "message":
 					Chatteilnehmer MeinBuddy = findeTeilnehmer( eingaben[1] );
@@ -266,9 +279,10 @@ public class ChatClient {
 					Verbindung1.connect( new InetSocketAddress( MeinBuddy.getIP(), MeinBuddy.getPort() ) );
 					Client meinClient = new Client( Verbindung1 );
 					meinClient.sendeDaten( "n "+meinName );
-					meinClient.sendeDaten( "m "+eingaben[1] );
+					meinClient.sendeDaten( "m "+eingaben[2] );
 					meinClient.sendeDaten( "x byebye" );
 					meinClient.close();
+					break;
 				default:
 					System.out.println("Welcome! To show commands use 'help', type 'connect [adress]' to connect to a server. Try 'list' for a list of online users and 'message [name] [message]' to message a user.");
 					break;
