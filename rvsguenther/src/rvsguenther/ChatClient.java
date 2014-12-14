@@ -3,16 +3,60 @@ package rvsguenther;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.nio.CharBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
 import java.util.concurrent.*;
 
 import chatserver.ChatServer;
 
 public class ChatClient {
+	
+	private static List<Chatteilnehmer> Teilnehmerliste = new ArrayList<Chatteilnehmer>();
+	private static String meinName = "Chatteilnehmer";
+	private static int meinPort = 1234;
+	private static Socket Verbindung = new Socket();
+	private static Client myAdressClient = new Client( Verbindung );
+	
+	public static Chatteilnehmer findeTeilnehmer( String Name ) {
+		while( !Teilnehmerliste.isEmpty() ) {
+			Chatteilnehmer AktuellerTeilnehmer = Teilnehmerliste.remove(0);
+			if( AktuellerTeilnehmer.getName().equals( Name ) ) 
+				return AktuellerTeilnehmer;
+		} 
+		return null;
+	}
+	
+	public static class Chatteilnehmer {
+		
+		private String name ="Chatteilnehmer", IP = "127.0.0.1";
+		private int Port = 1234;
+		
+		public Chatteilnehmer( String name, String IP, int Port )  {
+			this.name = name;
+			this.IP = IP;
+			this.Port = Port;
+		}
+		
+		public String getName() {
+			return this.name;
+		}
+		
+		public String getIP() {
+			return this.IP;
+		}
+		
+		public int getPort() {
+			return this.Port;
+		}
+		
+	}
 	
 	public static class Server {
 		
@@ -21,10 +65,13 @@ public class ChatClient {
 		public Server() throws IOException {
 			this.Server = new ServerSocket();
 			this.Server.bind( new InetSocketAddress( "127.0.0.1", 1234 ) );
+			//System.out.println("Server lauscht.");
 		}
 		
 		public Client getClient() throws IOException {
+			//System.out.println("Server wartet auf Verbindung.");
 			Socket Verbindung = this.Server.accept();
+			//System.out.println("Server bekommt Verbindung.");
 			return new Client( Verbindung );
 		}
 		
@@ -47,21 +94,31 @@ public class ChatClient {
 			return this.Name;
 		}
 		
-		public String[] empfangeDaten() throws IOException {
-			return new BufferedReader( new InputStreamReader( this.Verbindung.getInputStream() ) ).readLine().split(" "); 
+		public void connect( InetSocketAddress Adresse ) throws IOException {
+			this.Verbindung.connect( Adresse );
 		}
 		
+		public String[] empfangeDaten() throws IOException {
+			BufferedReader Reader = new BufferedReader( new InputStreamReader( this.Verbindung.getInputStream() ) );
+			/*if( Reader.ready() )
+				return Reader.readLine().split(" ");
+			else
+				return null;*/
+			return Reader.readLine().split(" ");
+		}
 		
-	}
-	
-	public static class AdressClient {
+		public String read() throws IOException {
+			BufferedReader Reader = new BufferedReader( new InputStreamReader( this.Verbindung.getInputStream() ) );
+			return Reader.readLine();
+		}
 		
-		private Socket Adressbuchverbindung = new Socket();
+		public void sendeDaten( String Daten ) throws IOException {
+			new PrintWriter( this.Verbindung.getOutputStream(), true ).println( Daten );
+		}
 		
-		public void connect( String ip, int port ) throws UnknownHostException, IOException {
-			this.Adressbuchverbindung.connect( new InetSocketAddress( ip, port ) );
-		}	
-		
+		private void close() throws IOException {
+			this.Verbindung.close();
+		}
 		
 	}
 	
@@ -74,7 +131,7 @@ public class ChatClient {
 			this.myServer = myServer;
 		}
 		
-		MyThread() {
+		void MyThread() {
 			_terminate = false;
 		}
 		
@@ -87,7 +144,6 @@ public class ChatClient {
 				try {
 					new clientthread( this.myServer.getClient() ).start();
 				} catch (IOException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 			}
@@ -103,7 +159,7 @@ public class ChatClient {
 			this.myClient = myClient;
 		}
 		
-		MyThread() {
+		void MyThread() {
 			_terminate = false;
 		}
 		
@@ -121,6 +177,11 @@ public class ChatClient {
 				}
 				switch( Daten[0] ) {
 					case "x":
+						try {
+							this.myClient.close();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
 						this.terminate();
 						break;
 					case "n":
@@ -141,8 +202,7 @@ public class ChatClient {
 	
 	public static void main( String[] args ) throws NumberFormatException, UnknownHostException, IOException {
 		Server myServer = new Server();
-		AdressClient myAdressClient = new AdressClient();
-		
+				
 		serverthread server = new serverthread( myServer );
 		server.start();
 		
@@ -159,7 +219,56 @@ public class ChatClient {
 					break;
 				case "connect":
 					String[] address = eingaben[1].split(":");
-					myAdressClient.connect(address[0], Integer.parseInt( address[1] ));
+					myAdressClient.connect( new InetSocketAddress( address[0], Integer.parseInt( address[1] ) ) );
+					myAdressClient.sendeDaten( "n "+meinName+" "+new Integer( meinPort ).toString() );
+					String[] Answer = myAdressClient.empfangeDaten();
+					if( Answer[0].equals( "s" ) )
+						System.out.println( "Erfolgreich am Server angemeldet." );
+					else {
+						System.err.println( "Konnte nicht am Server anmelden." );
+						myAdressClient.close();
+						break;
+					}
+					myAdressClient.sendeDaten( "t" );
+					String lol = myAdressClient.read();
+					System.out.println(lol);
+					lol = myAdressClient.read();
+					System.out.println(lol);
+					/*Answer = myAdressClient.empfangeDaten();
+					if( !Answer[0].equals( "t" ) ) {
+						System.err.println( "Server sendet verwirrende Antwort." );
+						myAdressClient.close();
+					}
+					int numOfUsers = Integer.parseInt( Answer[1] );
+					Teilnehmerliste.clear();
+					for(int j = 0; j <= Answer.length-1; j++)
+						System.out.println( Answer[j] );
+					myAdressClient.sendeDaten("t");
+					Answer = myAdressClient.empfangeDaten();
+					for(int j = 0; j <= Answer.length-1; j++)
+						System.out.println( Answer[j] );
+					/*for( int i = 1; i <= numOfUsers; i++ ) {
+						System.out.println("sende t");
+						Answer = myAdressClient.empfangeDaten();
+						for(int j = 0; j <= Answer.length-1; j++)
+							System.out.println( Answer[j] );
+						System.out.println("sende t2");
+						Teilnehmerliste.add( new Chatteilnehmer( Answer[0], Answer[1], Integer.parseInt( Answer[2] ) ) );
+					}*/
+					break;
+				case "message":
+					Chatteilnehmer MeinBuddy = findeTeilnehmer( eingaben[1] );
+					if( MeinBuddy == null ) {
+						System.out.println( "Teilnehmer nicht gefunden." );
+						break;
+					}
+					Socket Verbindung1 = new Socket();
+					Verbindung1.connect( new InetSocketAddress( MeinBuddy.getIP(), MeinBuddy.getPort() ) );
+					Client meinClient = new Client( Verbindung1 );
+					meinClient.sendeDaten( "n "+meinName );
+					meinClient.sendeDaten( "m "+eingaben[1] );
+					meinClient.sendeDaten( "x byebye" );
+					meinClient.close();
 				default:
 					System.out.println("Welcome! To show commands use 'help', type 'connect [adress]' to connect to a server. Try 'list' for a list of online users and 'message [name] [message]' to message a user.");
 					break;
