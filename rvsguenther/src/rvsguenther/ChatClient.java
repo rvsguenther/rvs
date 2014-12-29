@@ -4,39 +4,44 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
-import java.nio.CharBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
-import java.util.concurrent.*;
-
-import chatserver.ChatServer;
 
 public class ChatClient {
 	
+	// Teilnehmerliste vom Adressbuchserver
 	private static List<Chatteilnehmer> Teilnehmerliste = new ArrayList<Chatteilnehmer>();
+	// Name des Teilnehmers
 	private static String meinName = "Chatteilnehmer";
-	private static int meinPort = 1234;
-	private static Socket Verbindung = new Socket();
-	private static Client myAdressClient = new Client( Verbindung );
+	// Port des Teilnehmers
+	private static int meinPort = 1337;
+	// Client für die Verbindung zum Adressbuchserver
+	private static Client myAdressClient = new Client( new Socket() );
 	
 	public static Chatteilnehmer findeTeilnehmer( String Name ) {
+		// Während Teilnehmer in der Liste sind jeweils den ersten Teilnehmer entfernen,
+		// auf Matching untersuchen und falls ja, zurückgeben
 		while( !Teilnehmerliste.isEmpty() ) {
 			Chatteilnehmer AktuellerTeilnehmer = Teilnehmerliste.remove(0);
 			if( AktuellerTeilnehmer.getName().equals( Name ) ) 
 				return AktuellerTeilnehmer;
 		} 
+		// Teilnehmer nicht gefunden, null zurückgeben
 		return null;
 	}
 	
+	// Klasse für die Teilnehmer aus der Liste des Adressbuchservers
 	public static class Chatteilnehmer {
 		
+		// 
 		private String name ="Chatteilnehmer", IP = "127.0.0.1";
-		private int Port = 1234;
+		private int Port = 1337;
 		
 		public Chatteilnehmer( String name, String IP, int Port )  {
 			this.name = name;
@@ -58,25 +63,41 @@ public class ChatClient {
 		
 	}
 	
+	// Klasse für den Server
 	public static class Server {
 		
 		private ServerSocket Server;
 		
-		public Server() throws IOException {
-			this.Server = new ServerSocket();
-			this.Server.bind( new InetSocketAddress( "127.0.0.1", 1234 ) );
-			//System.out.println("Server lauscht.");
+		public Server( int port ) throws IOException {
+			try {
+				this.Server = new ServerSocket();
+				this.Server.bind( new InetSocketAddress( "127.0.0.1", port ) );
+			}
+			catch(BindException e) {
+				System.err.println("Kann nicht an Adresse binden, da die Adresse bereits benutzt wird.\nProgramm wird beendet.");
+				System.exit(-1);
+			}
+			catch(IOException e) {
+				System.err.println("Es ist ein Fehler aufgetreten.\nProgramm wird beendet.");
+				System.exit(-1);
+			}
 		}
 		
+		// blockiert bis Verbindung ankommt, gibt dann neuen Client mit Verbindung zurück
 		public Client getClient() throws IOException {
-			//System.out.println("Server wartet auf Verbindung.");
-			Socket Verbindung = this.Server.accept();
-			//System.out.println("Server bekommt Verbindung.");
-			return new Client( Verbindung );
+			try {
+				Socket Verbindung = this.Server.accept();
+				return new Client( Verbindung );
+			}
+			catch(IOException e) {
+				System.err.println("Konnte Clientverbindung nicht verarbeiten.");
+				return null;
+			}
 		}
 		
 	}
 	
+	// eigentliche ChatClient Klasse
 	public static class Client {
 		
 		private Socket Verbindung;
@@ -94,36 +115,51 @@ public class ChatClient {
 			return this.Name;
 		}
 		
+		// für die Verbindung zu anderen Clients
 		public void connect( InetSocketAddress Adresse ) throws IOException {
 			this.Verbindung.connect( Adresse );
 		}
 		
+		// empfange einen Buffer der mit \n terminiert ist
 		public String[] empfangeDaten() throws IOException {
-			BufferedReader Reader = new BufferedReader( new InputStreamReader( this.Verbindung.getInputStream() ) );
-			/*if( Reader.ready() )
+			try {
+				BufferedReader Reader = new BufferedReader( new InputStreamReader( this.Verbindung.getInputStream() ) );
 				return Reader.readLine().split(" ");
-			else
-				return null;*/
-			return Reader.readLine().split(" ");
+			}
+			catch(IOException e) {
+				System.err.println("Verbindung wurde zurückgesetzt.");
+				return null;
+			}
 		}
 		
+		// für den Empfang der Teilnehmerliste am Adressbuchserver
 		public String[] readListe() throws IOException {
-			List<String> Inhalt = new ArrayList<String>();
-			BufferedReader Reader = new BufferedReader( new InputStreamReader( this.Verbindung.getInputStream() ) );
-			String tmp = "";
-			char r = 0;
-			do {
-			r = (char) Reader.read();
-				if( r != '\n' && r!= '\r' )
-					tmp += String.valueOf(r);
-				else {
-					Inhalt.add(tmp);
-					tmp = "";
-				}
-			} while( Reader.ready() );
-			return Inhalt.toArray(new String[0]);
+			try {
+				// ArrayList für die Liste
+				List<String> Inhalt = new ArrayList<String>();
+				BufferedReader Reader = new BufferedReader( new InputStreamReader( this.Verbindung.getInputStream() ) );
+				// Buffer char-weise ablesen und bei \n und \r den String in die Liste speichern,
+				// dann String zurücksetzen und weiterlesen, solange gesendet wird
+				String tmp = "";
+				char r = 0;
+				do {
+				r = (char) Reader.read();
+					if( r != '\n' && r!= '\r' )
+						tmp += String.valueOf(r);
+					else {
+						Inhalt.add(tmp);
+						tmp = "";
+					}
+				} while( Reader.ready() );
+				return Inhalt.toArray(new String[0]);
+			}
+			catch(IOException e) {
+				System.err.println("Verbindung wurde zurückgesetzt.");
+				return null;
+			}
 		}
 		
+		// eine Line an den Empfänger senden
 		public void sendeDaten( String Daten ) throws IOException {
 			new PrintWriter( this.Verbindung.getOutputStream(), true ).println( Daten );
 		}
@@ -134,6 +170,7 @@ public class ChatClient {
 		
 	}
 	
+	// Der Thread für die Serverfunktionalität
 	public static class serverthread extends Thread {
 		
 		private boolean _terminate = false;
@@ -192,7 +229,7 @@ public class ChatClient {
 						try {
 							this.myClient.close();
 						} catch (IOException e) {
-							e.printStackTrace();
+							//fehler
 						}
 						this.terminate();
 						break;
@@ -213,18 +250,19 @@ public class ChatClient {
 	}
 	
 	public static void main( String[] args ) throws NumberFormatException, UnknownHostException, IOException {
-		Server myServer = new Server();
-				
+		Server myServer = new Server(meinPort);
 		serverthread server = new serverthread( myServer );
 		server.start();
 		
 		Scanner S = new Scanner(System.in);
-		System.out.println("Welcome! To show commands use 'help', type 'connect [ip:port]' to connect to a server. Try 'list' for a list of online users and 'message [name] [message]' to message a user.");
+		System.out.println("Welcome! To show commands use 'help', type 'connect [ip:port]' to connect to a server.\nTry 'list' for a list of online users and 'message [name] [message]' to message a user.\n'Exit' closes the programm.");
+		System.out.print(">> ");
 		while(true) {
 			String[] eingaben = S.nextLine().split(" ");
 			switch( eingaben[0] ) {
 				case "help":
 					System.out.println("Welcome! To show commands use 'help', type 'connect [adress]' to connect to a server. Try 'list' for a list of online users and 'message [name] [message]' to message a user.");
+					System.out.print(">> ");
 					break;
 				case "list":
 					myAdressClient.sendeDaten( "t" );
