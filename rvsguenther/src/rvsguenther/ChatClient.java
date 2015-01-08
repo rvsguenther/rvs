@@ -251,7 +251,12 @@ public class ChatClient {
 							this.terminate();
 							break;
 						case "n":
-							this.myClient.setName( Daten[1] );
+							if( Daten[1].equals(meinName) ) {
+								this.myClient.sendeDaten( "e Wrong_Nickname" );
+							}
+							else {
+								this.myClient.setName( Daten[1] );
+							}
 							break;
 						case "m":
 							System.out.println( myClient.getName()+": "+Daten[1]);
@@ -260,6 +265,7 @@ public class ChatClient {
 							System.err.println( "Client sendet Fehler: "+Daten[1]);
 						default:
 							System.err.println( "Verstehe Client nicht." );
+							this.myClient.sendeDaten( "e DoNotUnderstand" );							
 							break;	
 					}
 				}
@@ -267,12 +273,13 @@ public class ChatClient {
 					System.err.println("Keine Daten Empfangen.");
 					System.err.println(e.getMessage());
 				} catch( IOException e ) {
-					e.printStackTrace();
+					System.err.println("Verbindungsfehler");
 				}
 			}
 		}
 	}
 	
+	// Diese Funktion verwaltet die Benutzereingaben
 	public static void kommuniziere() throws IOException {
 		System.out.print(">> ");
 		String[] eingaben = SystemEin.nextLine().split(" ");
@@ -285,7 +292,7 @@ public class ChatClient {
 				String Answer2[] = myAdressClient.empfangeDaten();
 				if( !Answer2[0].equals( "t" ) ) {
 					System.err.println( "Server sendet verwirrende Antwort." );
-					myAdressClient.close();
+					break;
 				}
 				int numOfUsers1 = Integer.parseInt( Answer2[1] );
 				Teilnehmerliste.clear();
@@ -312,7 +319,7 @@ public class ChatClient {
 				String Answer1[] = myAdressClient.empfangeDaten();
 				if( !Answer1[0].equals( "t" ) ) {
 					System.err.println( "Server sendet verwirrende Antwort." );
-					myAdressClient.close();
+					break;
 				}
 				int numOfUsers = Integer.parseInt( Answer1[1] );
 				Teilnehmerliste.clear();
@@ -329,6 +336,7 @@ public class ChatClient {
 					System.out.println( "Teilnehmer nicht gefunden." );
 					break;
 				}
+				// Verbindung zum Client aufbauen und Nachricht senden
 				Socket Verbindung1 = new Socket();
 				Verbindung1.connect( new InetSocketAddress( MeinBuddy.getIP(), MeinBuddy.getPort() ) );
 				Client meinClient = new Client( Verbindung1 );
@@ -356,9 +364,11 @@ public class ChatClient {
 	
 	public static void main( String[] args ) throws NumberFormatException, UnknownHostException, IOException {
 		try {
+			// Server Initialisieren und Starten
 			Server myServer = new Server(meinPort);
 			serverthread server = new serverthread( myServer );
 			server.start();
+			// Globalen Eingabestream allokieren
 			SystemEin = new Scanner( System.in );
 		}
 		catch(IOException e) {
@@ -372,11 +382,13 @@ public class ChatClient {
 				kommuniziere();
 			}
 			catch(NoSuchElementException e) {
+				System.err.println("Befehl führte zu Fehlern.");
 			}
 			catch(NullPointerException e) {
+				System.err.println("Befehl führte zu Fehlern.");
 			}
 			catch(NumberFormatException e) {
-				System.err.println("Port muss numerisch sein.");
+				System.err.println("Es wurde ein numerischer Wert erwartet.");
 			}
 			catch(IOException e) {
 				System.err.println("Nicht verbunden.");
