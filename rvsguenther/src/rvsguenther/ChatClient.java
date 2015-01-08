@@ -1,6 +1,5 @@
 package rvsguenther;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
@@ -13,8 +12,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Scanner;
-
-import rvsguenther.ChatClient.Chatteilnehmer;
 
 public class ChatClient {
 	
@@ -83,12 +80,13 @@ public class ChatClient {
 				this.bindeServer(meinPort);
 			}
 			catch(IOException e) {
-				System.err.println("Es ist ein Fehler aufgetreten.\nProgramm wird beendet.");
+				System.err.println("Es ist ein Fehler aufgetreten.\nServer konnte nicht gestartet werden.\nProgramm wird beendet.");
 				System.err.println(e.getLocalizedMessage());
 				System.exit(-1);
 			}
 		}
 		
+		// Server an Port binden, falls Port in benutzung ist an anderen Port binden
 		public void bindeServer( int port ) throws IOException {
 			while( !this.Server.isBound() ) {
 				try {
@@ -98,10 +96,16 @@ public class ChatClient {
 					System.err.println("Kann nicht an Adresse binden, da die Adresse bereits benutzt wird.");
 					System.err.println("Bitte geben sie einen freien Port an, um an diesen zu binden.");
 					System.err.print("[Port]: ");
-					port = Integer.parseInt( SystemEin.nextLine() );	
+					try {
+						port = Integer.parseInt( SystemEin.nextLine() );
+					}
+					catch( NumberFormatException e1 ) {
+						System.err.println("Port muss numerisch sein.");
+					}
 				}
 				catch( IOException e ) {
-					System.err.println(e.getLocalizedMessage());
+					System.err.println( "Socket konnte nicht gebunden werden." );
+					System.exit(-1);
 				}
 			}
 		}
@@ -133,8 +137,7 @@ public class ChatClient {
 				try {
 					this.Eingaben = new Scanner( new InputStreamReader( this.Verbindung.getInputStream() ) );
 				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+					System.err.println( "Kann Datenstrom nicht empfangen." );
 				}
 			}
 		}
@@ -162,7 +165,7 @@ public class ChatClient {
 			try {
 				return Eingaben.nextLine().split(" ");
 			}
-			catch(NullPointerException e) {
+			catch( NullPointerException e ) {
 				return new String[0];
 			}
 		}
@@ -201,17 +204,20 @@ public class ChatClient {
 			_terminate = true;
 		}
 		
+		// Dauerschleife, welche Clientverbindungen annimmt und einen Thread für diese Startet
 		public void run() {
 			while( !_terminate ) {
 				try {
 					new clientthread( this.myServer.getClient() ).start();
 				} catch (IOException e) {
-					e.printStackTrace();
+					System.err.println( "Kann Clientverbindung nicht annehmen." );
 				}
 			}
 		}
 	}
 	
+	// In diesem Thread läuft die Clientverbindung, für jede Verbindung wird ein Thread erstellt
+	// Die Threads werden vom Serverthread erstellt und beenden sich, wenn der Client die Verbindung schließt
 	public static class clientthread extends Thread {
 		
 		private boolean _terminate = false;
@@ -229,6 +235,7 @@ public class ChatClient {
 			_terminate = true;
 		}
 		
+		// Dauerschleife in der auf Eingaben gewartet wird, diese werden direkt verarbeitet
 		public void run() {
 			while( !_terminate ) {
 				String[] Daten = null;
@@ -239,6 +246,7 @@ public class ChatClient {
 							try {
 								this.myClient.close();
 							} catch (IOException e) {
+								System.err.println("Kann Clientverbindung nicht ordnungsgemäß schließen.");
 							}
 							this.terminate();
 							break;
@@ -258,7 +266,7 @@ public class ChatClient {
 				catch( ArrayIndexOutOfBoundsException e) {
 					System.err.println("Keine Daten Empfangen.");
 					System.err.println(e.getMessage());
-				} catch (IOException e) {
+				} catch( IOException e ) {
 					e.printStackTrace();
 				}
 			}
